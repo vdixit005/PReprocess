@@ -1,0 +1,13 @@
+Package: PRevalue
+Type: Package
+Title: Calculate PRevalue for testing logconcavity
+Version: 1.0.0
+Author: c(person("Vaidehi", "Dixit", email = "vdixit@missouri.edu", role = c("aut", "cre")),
+      person("Ryan", "Martin", email = "rgmarti3@ncsu.edu", role = "aut"))    
+Maintainer: The package maintainer <vdixit@missouri.edu>
+Description: To test if the observed data comes from a logconcave distribution, this package calculates the log(evalue) for testing logconcavity based on Predictive Recursion (PR)
+Imports: logcondens    
+License: `use_mit_license()`
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.3
