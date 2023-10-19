@@ -1,9 +1,14 @@
-#' Calculate PRevalue for testing logconcavity
+#' Calculate PReprocess for testing logconcavity
 #'
 #' This function takes in data and gives the user an e-value for testing logconcavity
 #'
-#' @param X univariate data as a vector
-#' @return A scalar e-value based on PR
+#' @param X Univariate data as a vector
+#' @param d Parametric kernel function of form d(x,U)
+#' @param U Mixing density support, where U is an equispaced and odd length vector as the support for univariate f
+#' @param f A vector of initial guess for f or final f based on old data
+#' @param n Total sample size already used (default is 0)
+#' @param L Value of PR log-likelihood based on old data (default is 0)
+#' @return A scalar log(e-value) based on PR, PR object f_n and PR log-likelihood L (to use if further data gets incorporated)
 #' @examples
 #' # Generate data from a bimodal density (not log-concave)
 #' datagen = function(n){
@@ -19,32 +24,31 @@
 #' return(ans)
 #' }
 #' X = datagen(1000)
-#' ans = evalue.logconcave(X)
+#' # PR initialization
+#' U = cbind(seq(-10, 20, length.out = 101), seq(0.01, 3, length.out = 101))
+#' f0 = rep(1, 101*101)
+#' d1 = function(x,u){mapply(function(mean,sd) dnorm(x,mean,sd), mean=u[,1], sd=u[,2])}
+#' ans = eprocess.logconcave(X,d=d1,U=U,f=f0,n=0,L=0)
+#' # If new data is received, update the process
+#' Y = datagen(1000)
+#' X = c(X, Y)
+#' ans2 = eprocess.logconcave(X,d=d1,U=U,f=ans$f_n$f,n=1000, L=ans$`PR-loglik`)
+#' # More data is received
+#' Y = datagen(1000)
+#' X = c(X, Y)
+#' ans3 = eprocess.logconcave(X,d=d1,U=U,f=ans2$f_n$f,n=2000, L = ans2$`PR-loglik`)
 #'
-#' # If data is received in batches of 100
-#' X = datagen(5000)
-#' index = seq(100, 5000, by = 100)
-#' log_evalue = NULL
-#' for(i in index){
-#' log_evalue = c(log_evalue, evalue.logconcave(X[1:i]))
-#' }
-#' plot(index, log_evalue, type="l")
 #' @source The PR functions are based on code from \url{https://www4.stat.ncsu.edu/~rmartin/Codes/pr.R}
 #' @references
 #' Dixit, Vaidehi, and Ryan Martin. "Anytime valid and asymptotically optimal statistical inference
-#' driven by predictive recursion"
+#' driven by predictive recursion" arXiv preprint arXiv:2309.13441 (2023)
 #' ########################################################################################
 #' @export
-evalue.logconcave = function(X){
-
-  # PR initialization
-  U = cbind(seq(-10, 20, length.out = 101), seq(0.01, 3, length.out = 101))
-  f0 = rep(1, 101*101)
-  w <- function(i) 1 / (i + 1)^0.67
-
+eprocess.logconcave = function(X,d,U,f,n=0,L=0){
+  w <- function(i) {1 / (i + n + 1)^0.67}
   # PR
-  f.pr = pr(X = X, d = d1, U = U, f0 = f0, w = w)
-
+  f.pr = pr(X = X[(n+1):length(X)], d = d, U = U, f0 = f, w = w)
+  L = L + f.pr$L
   # Get log-concave MLE on X
   npmle <- logcondens::logConDens(x = X)
 
@@ -53,14 +57,9 @@ evalue.logconcave = function(X){
     xs = X, res = npmle, which = 2)[, 3]
 
   # log-PRevalue
-  log_evalue = (- f.pr$L - sum(log(eval_X)))
+  log_evalue = (L - sum(log(eval_X)))
 
-  return(log_evalue)
-}
-
-
-d1 = function(x,u){
-  mapply(function(mean,sd) dnorm(x,mean,sd), mean=u[,1], sd=u[,2])
+  return(list("logeprocess" = log_evalue, "f_n" = f.pr, "PR-loglik" = L))
 }
 
 int <- function(f, x, tol=1e-10) {
@@ -100,7 +99,7 @@ pr <- function(X, d, U, f0, w, nperm = 1, perm = NULL,...) {
   t <- nrow(U)
   du <- ncol(U)
   if(missing(f0)) f0 <- 1 + 0 * U[,1]
-  if(missing(w)) w <- function(i) 1 / (i + 1)
+  # if(missing(w)) w <- function(i) 1 / (i + 1)
   N <- nperm
   if(N == 1 && is.null(perm)) {
     perm <- matrix(0, n, N)
@@ -128,7 +127,7 @@ pr <- function(X, d, U, f0, w, nperm = 1, perm = NULL,...) {
       f.avg <- (j - 1) * f.avg / j + f / j
       L.avg <- (j - 1) * L.avg / j + L / j
     }
-    ans = list(U = U, f=f.avg, L=-L.avg)
+    ans = list(U = U, f=f.avg, L=L.avg)
     class(ans) = "pr"
     return(ans)
   }
@@ -149,7 +148,7 @@ pr <- function(X, d, U, f0, w, nperm = 1, perm = NULL,...) {
       f.avg <- (j - 1) * f.avg / j + f / j
       L.avg <- (j - 1) * L.avg / j + L / j
     }
-    ans = list(U = U, f=f.avg, L=-L.avg)
+    ans = list(U = U, f=f.avg, L=L.avg)
     class(ans) = "pr"
     return(ans)
   }
